@@ -1,0 +1,133 @@
+#include "xspi.h"
+#include "xspi_l.h"
+const u8 command = 0x04; //B00000100
+#define SPI_DEVICE_ID       XPAR_SPI_0_DEVICE_ID
+XSpi device;
+const u8 enableUpdateMSB = 0x1C; //B00011100
+const u8 enableUpdateLSB = 0x02; //B00000010
+u8 bytes2 [2] = {enableUpdateMSB,enableUpdateLSB};
+void init_spi();
+void enablepot(char csPin);
+void potWrite(char csPin, int value);
+
+int main(void)
+{
+ init_spi();
+}
+
+void init_spi(){
+
+//INICIO SPI
+int Status;
+XSpi_Config *ConfigPtr;
+ConfigPtr = XSpi_LookupConfig(XPAR_AXI_QUAD_SPI_1_DEVICE_ID);
+
+//prueba de puerto.
+if (ConfigPtr == NULL) {
+xil_printf("No se encontro el SPI\n\r");
+}
+
+//prueba de inicializacion.
+Status = XSpi_CfgInitialize(&device, ConfigPtr,
+			  ConfigPtr->BaseAddress);
+if (Status != XST_SUCCESS) {
+	xil_printf("falla al iniciar SPI\n\r");
+}
+xil_printf("SPI listo. \n\r");
+XSpi_CfgInitialize(&device, ConfigPtr, ConfigPtr->BaseAddress);
+Status = XSpi_SetOptions(&device, XSP_MASTER_OPTION | XSP_CLK_ACTIVE_LOW_OPTION | XSP_CLK_PHASE_1_OPTION | XSP_MANUAL_SSELECT_OPTION);
+  if (Status != XST_SUCCESS) {
+      return XST_FAILURE;
+  }
+
+XSpi_Start(&device);
+XSpi_IntrGlobalDisable(&device);
+}
+
+void enablepot( char csPin){
+	int Status;
+	switch (csPin) {
+		case '1': {
+			xil_printf("entro enable 1 \n\r");
+			Status =XSpi_SetSlaveSelect(&device, 0x01);
+			XGpio_DiscreteWrite(&gpo4, 1, 1110);
+			if(Status != XST_SUCCESS) {
+				xil_printf("NO SE PUDO enable 1 \n\r");}
+			break;
+		}
+		case '2': {
+			xil_printf("entro enable 2 \n\r");
+			XGpio_DiscreteWrite(&gpo4, 1, 1101);
+			XSpi_SetSlaveSelect(&device, 0x02);
+			break;
+		}
+		case '3': {
+			xil_printf("entro enable 3 \n\r");
+			XSpi_SetSlaveSelect(&device, 0x03);
+			XGpio_DiscreteWrite(&gpo4, 1, 1011);
+			break;
+		}
+		case '4': {
+			xil_printf("entro enable 4 \n\r");
+			XSpi_SetSlaveSelect(&device, 0x04);
+			XGpio_DiscreteWrite(&gpo4, 1, 0111);
+			break;
+		}
+		default: {
+			XSpi_SetSlaveSelect(&device, 0x01);
+			break;}};
+	XSpi_Transfer(&device, bytes2, NULL, 2);
+    xil_printf("%d  \n\r", enableUpdateMSB);
+    xil_printf("%d \n\r", enableUpdateLSB);
+	usleep(2000000);
+	XGpio_DiscreteWrite(&gpo4, 1, 1111);
+}
+
+void potWrite(char csPin, int value){
+	int Status;
+	switch (csPin) {
+		case '1': {
+			xil_printf("entro write 1 \n\r");
+			Status =XSpi_SetSlaveSelect(&device, 0x01);
+			XGpio_DiscreteWrite(&gpo4, 1, 1110);
+			if(Status != XST_SUCCESS) {
+				xil_printf("NO SE PUDO write 1 \n\r");
+				}
+			break;
+		}
+		case '2': {
+			XGpio_DiscreteWrite(&gpo4, 1, 1101);
+			XSpi_SetSlaveSelect(&device, 0x02);
+			break;
+		}
+		case '3': {
+			XGpio_DiscreteWrite(&gpo4, 1, 1011);
+			XSpi_SetSlaveSelect(&device, 0x03);
+			break;
+		}
+		case '4': {
+			XGpio_DiscreteWrite(&gpo4, 1, 0111);
+			XSpi_SetSlaveSelect(&device, 0x04);
+			break;
+		}
+		default: {
+			XSpi_SetSlaveSelect(&device, 0x01);
+			XGpio_DiscreteWrite(&gpo4, 1, 1110);
+			break;}}
+	u8 byte1;
+	u8 shiftedvalue = value >> 8;
+	byte1 = command | shiftedvalue;
+	u8 byte0;
+	byte0 = (value & 0xFF) ;
+	//0xFF = B11111111 trunicates value to 8 bits
+	u8 bytes [2] = {byte1,byte0};
+    xil_printf("%d  \n\r", byte1);
+    xil_printf("%d \n\r", byte0);
+	XSpi_Transfer(&device, bytes, NULL, 2);
+	usleep(2000000);
+	XGpio_DiscreteWrite(&gpo4, 1, 1111);
+}
+
+
+
+
